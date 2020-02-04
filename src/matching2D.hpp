@@ -1,4 +1,3 @@
-
 #ifndef matching2D_hpp
 #define matching2D_hpp
 
@@ -26,5 +25,11 @@ void detKeypointsModern(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, std:
 void descKeypoints(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descriptors, std::string descriptorType);
 void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::KeyPoint> &kPtsRef, cv::Mat &descSource, cv::Mat &descRef,
                       std::vector<cv::DMatch> &matches, std::string descriptorType, std::string matcherType, std::string selectorType);
+void apply_box_filter(std::vector<cv::KeyPoint> &keypoints, cv::Rect& rectangle);
+float get_avg_kp();
+float get_avg_kp_time();
+float get_avg_desc_time();
+float get_avg_match_time();
+float get_avg_match();
 
 #endif /* matching2D_hpp */
