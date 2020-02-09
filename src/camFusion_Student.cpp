@@ -154,5 +154,69 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame, DataFrame &currFrame)
 {
-    // ...
+    multimap<int, int> matched_boxes_accumulated;
+
+    for (auto it = matches.begin(); it != matches.end(); ++it)
+    {
+        int prev_kpt_index =  it->queryIdx;
+        int curr_kpt_index =   it->trainIdx;
+
+        //get prev and curr kpt location
+        cv::Point2f prev_point = prevFrame.keypoints.at(prev_kpt_index).pt;
+        cv::Point2f curr_point = currFrame.keypoints.at(curr_kpt_index).pt;
+
+        std::vector<int> prev_box_ids;
+        std::vector<int> curr_box_ids;
+
+        // loop over pev bounding box
+        for (auto prev_box : prevFrame.boundingBoxes)
+        {
+            // if prev box contains point, store it
+            if (prev_box.roi.contains(prev_point))
+            {
+                prev_box_ids.push_back(prev_box.boxID);
+            }
+        }
+
+        //loop over curr bounding boxes
+        for (auto curr_box : currFrame.boundingBoxes)
+        {
+            // if curr box contains point, store it
+            if (curr_box.roi.contains(curr_point))
+            {
+                curr_box_ids.push_back(curr_box.boxID);
+            }
+        }
+
+        // generate pairs between all stored prev and curr boxes
+        for (auto prev_box_id : prev_box_ids)
+        {
+            for (auto curr_box_id : curr_box_ids)
+            {
+                matched_boxes_accumulated.insert({prev_box_id, curr_box_id});
+            }
+        }
+    }
+
+    // loop over all boxes of the prev frame
+    for (int i = 0; i < prevFrame.boundingBoxes.size(); ++i)
+    {
+        // get a range of all curr boxes matched based on kpts above for this prev box
+        auto it_pair = matched_boxes_accumulated.equal_range(i);
+
+        vector<int> count;
+        count.resize(currFrame.boundingBoxes.size(), 0);
+
+        // count the number of matched curr boxes for each curr box
+        for (auto it = it_pair.first; it != it_pair.second; ++it)
+        {
+            count.at((*it).second) = count.at((*it).second) + 1;
+        }
+
+        auto max_elem_it = std::max_element(count.begin(), count.end());
+        int max_elem_box_id = std::distance(count.begin(), max_elem_it);
+
+        //insert the best match candidate
+        bbBestMatches.insert({i, max_elem_box_id});
+    }
 }
