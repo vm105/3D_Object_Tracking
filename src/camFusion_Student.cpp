@@ -133,15 +133,29 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
 // associate a given bounding box with the keypoints it contains
 void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
-}
+    double running_avg = 0.0;
+    double running_sum = 0.0;
+    double num_points = 0.0;
 
+    // loop over all matches
+    for (auto match : kptMatches)
+    {
+        int curr_kpt_index = match.trainIdx;
+        cv::Point2f curr_point = kptsCurr.at(curr_kpt_index).pt;
 
-// Compute time-to-collision (TTC) based on keypoint correspondences in successive images
-void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, 
-                      std::vector<cv::DMatch> kptMatches, double frameRate, double &TTC, cv::Mat *visImg)
-{
-    // ...
+        if (boundingBox.roi.contains(curr_point))
+        {
+            running_sum += match.distance;
+            running_avg = running_sum/++num_points;
+            double err = (match.distance - running_avg);
+            // std::cout << "err " << err << " avg dist " << running_avg << " curr dist " << match.distance << std::endl;
+            // if the distance is less than equal to moving avg distance add it to the vector
+            if (err < 0)
+            {
+                boundingBox.kptMatches.push_back(match);
+            }
+        }
+    }
 }
 
 double get_median(vector<double>& point_vector)
@@ -169,6 +183,48 @@ double get_median(vector<double>& point_vector)
     }
 
     return median;
+}
+
+// Compute time-to-collision (TTC) based on keypoint correspondences in successive images
+void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, 
+                      std::vector<cv::DMatch> kptMatches, double frameRate, double &TTC, cv::Mat *visImg)
+{
+
+    vector<double> dist_ratios;
+    double dt = 1/frameRate;
+    for (auto match_outer : kptMatches)
+    {
+        int prev_kpt_index =  match_outer.queryIdx;
+        int curr_kpt_index =  match_outer.trainIdx;
+
+        //get outer prev and curr kpt location
+        cv::Point2f prev_point_outer = kptsPrev.at(prev_kpt_index).pt;
+        cv::Point2f curr_point_outer = kptsCurr.at(curr_kpt_index).pt;
+
+        for (auto match_inner : kptMatches)
+        {
+            int prev_kpt_index =  match_inner.queryIdx;
+            int curr_kpt_index =  match_inner.trainIdx;
+
+            //get outer prev and curr kpt location
+            cv::Point2f prev_point_inner = kptsPrev.at(prev_kpt_index).pt;
+            cv::Point2f curr_point_inner = kptsCurr.at(curr_kpt_index).pt;
+
+            double dist_prev = cv::norm(prev_point_outer - prev_point_inner);
+            double dist_curr = cv::norm(curr_point_outer - curr_point_inner);
+
+            if (dist_prev > std::numeric_limits<double>::epsilon() && dist_curr >= 100.0)
+            {
+                double dist_ratio = dist_curr/ dist_prev;
+                dist_ratios.push_back(dist_ratio);
+                // std::cout << "dist ratio " << dist_ratio << std::endl;
+            }
+        }
+    }
+
+    double median_dist_ratio = get_median(dist_ratios);
+    std::cout << "median ratio " << median_dist_ratio << std::endl;
+    TTC = -dt/(1- median_dist_ratio);
 }
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
