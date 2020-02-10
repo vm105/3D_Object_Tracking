@@ -144,14 +144,67 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
     // ...
 }
 
+double get_median(vector<double>& point_vector)
+{
+    double median = 0.0;
+    if (point_vector.size() % 2)
+    {
+       auto median_it = point_vector.begin();
+       std::advance(median_it, point_vector.size()/2);
+       nth_element(point_vector.begin(), median_it , point_vector.end());
+       median = *median_it;
+    }
+    else
+    {
+       auto median_it_1 = point_vector.begin();
+       auto median_it_2 = point_vector.begin();
+
+       std::advance(median_it_1,  point_vector.size()/2);
+       std::advance(median_it_2, point_vector.size()/2 -1);
+
+       nth_element(point_vector.begin(), median_it_1, point_vector.end());
+       nth_element(point_vector.begin(), median_it_2, point_vector.end());
+
+       median = (*median_it_1 + *median_it_2)/2.0;
+    }
+
+    return median;
+}
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC)
 {
-    // ...
+   // equation to compute TTC:
+   // TTC = min_x_curr * dt/ (min_x_prev - min_x_curr)
+
+    double dt = 1/frameRate;
+    double min_x_prev = std::numeric_limits<double>::max();
+    double min_x_curr = std::numeric_limits<double>::max();
+
+    std::vector<double> prev_points;
+    std::vector<double> curr_points;
+
+    //push points to vectot
+    for (auto point : lidarPointsPrev)
+    {
+        prev_points.push_back(point.x);
+    }
+
+    for (auto point: lidarPointsCurr)
+    {
+        curr_points.push_back(point.x);
+    }
+
+    min_x_prev = get_median(prev_points);
+    min_x_curr = get_median(curr_points);
+
+    std::cout << "min_x_curr " << min_x_curr << std::endl;
+    std::cout << "min_x_prev " << min_x_prev << std::endl;
+
+    //compute TTC
+    TTC = (min_x_curr * dt)/(min_x_prev - min_x_curr);
+
 }
-
-
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame, DataFrame &currFrame)
 {
     multimap<int, int> matched_boxes_accumulated;
