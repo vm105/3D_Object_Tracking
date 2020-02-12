@@ -147,10 +147,10 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
         {
             running_sum += match.distance;
             running_avg = running_sum/++num_points;
-            double err = (match.distance - running_avg);
+            double err = 100 * (match.distance - running_avg);
             // std::cout << "err " << err << " avg dist " << running_avg << " curr dist " << match.distance << std::endl;
-            // if the distance is less than equal to moving avg distance add it to the vector
-            if (err < 0)
+            // if error percentage with the moving avg is less than 10 add it to the vector
+            if (err < 10)
             {
                 boundingBox.kptMatches.push_back(match);
             }
